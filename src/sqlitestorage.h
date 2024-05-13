@@ -62,12 +62,9 @@ public:
 
       @param calendar is a pointer to a valid Calendar object.
       @param databaseName is the name of the database containing the Calendar data.
-      @param validateNotebooks set to true for saving only those incidences
-             that belong to an existing notebook of this storage
     */
     explicit SqliteStorage(const ExtendedCalendar::Ptr &cal,
-                           const QString &databaseName,
-                           bool validateNotebooks = true);
+                           const QString &databaseName);
 
     /**
       Constructs a new SqliteStorage object for Calendar @p calendar. Location
@@ -75,11 +72,8 @@ public:
       enivronment variable.
 
       @param calendar is a pointer to a valid Calendar object.
-      @param validateNotebooks set to true for saving only those incidences
-             that belong to an existing notebook of this storage
     */
-    explicit SqliteStorage(const ExtendedCalendar::Ptr &cal,
-                           bool validateNotebooks = true);
+    explicit SqliteStorage(const ExtendedCalendar::Ptr &cal);
 
     /**
       Destructor.
@@ -117,16 +111,9 @@ public:
 
     /**
       @copydoc
-      ExtendedStorage::loadNotebookIncidences(const QString &)
-    */
-    bool loadNotebookIncidences(const QString &notebookUid);
-
-    /**
-      @copydoc
       ExtendedStorage::purgeDeletedIncidences(const KCalCore::Incidence::List &, const QString &)
     */
-    bool purgeDeletedIncidences(const KCalendarCore::Incidence::List &list,
-                                const QString &notebookUid = QString());
+    bool purgeDeletedIncidences(const KCalendarCore::Incidence::List &list);
 
     /**
       @copydoc
@@ -186,29 +173,26 @@ public:
       @copydoc
       ExtendedStorage::insertedIncidences()
     */
-    bool insertedIncidences(KCalendarCore::Incidence::List *list, const QDateTime &after,
-                            const QString &notebookUid = QString());
+    bool insertedIncidences(KCalendarCore::Incidence::List *list, const QDateTime &after);
 
     /**
       @copydoc
       ExtendedStorage::modifiedIncidences()
     */
-    bool modifiedIncidences(KCalendarCore::Incidence::List *list, const QDateTime &after,
-                            const QString &notebookUid = QString());
+    bool modifiedIncidences(KCalendarCore::Incidence::List *list, const QDateTime &after);
 
     /**
       @copydoc
       ExtendedStorage::deletedIncidences()
     */
     bool deletedIncidences(KCalendarCore::Incidence::List *list,
-                           const QDateTime &after = QDateTime(),
-                           const QString &notebookUid = QString());
+                           const QDateTime &after = QDateTime());
 
     /**
       @copydoc
       ExtendedStorage::allIncidences()
     */
-    bool allIncidences(KCalendarCore::Incidence::List *list, const QString &notebookUid = QString());
+    bool allIncidences(KCalendarCore::Incidence::List *list);
 
     /**
       @copydoc
@@ -227,12 +211,6 @@ public:
       ExtendedStorage::virtual_hook()
     */
     virtual void virtual_hook(int id, void *data);
-
-protected:
-    bool loadNotebooks();
-    bool insertNotebook(const Notebook::Ptr &nb);
-    bool modifyNotebook(const Notebook::Ptr &nb);
-    bool eraseNotebook(const Notebook::Ptr &nb);
 
 private:
     //@cond PRIVATE

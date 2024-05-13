@@ -29,7 +29,6 @@
 
 #include "mkcal_export.h"
 #include "extendedstorage.h"
-#include "notebook.h"
 
 #include <KCalendarCore/Incidence>
 
@@ -94,16 +93,7 @@ public:
       @param isDefault if the notebook is the default one in the DB
       @return true if the operation was successful; false otherwise.
     */
-    bool modifyCalendars(const Notebook &notebook, DBOperation dbop, sqlite3_stmt *stmt, bool isDefault);
-
-    /*
-      Select notebooks from Calendars table.
-
-      @param stmt prepared sqlite statement for calendars table
-      @param isDefault true if the selected notebook is the DB default one
-      @return the queried notebook.
-    */
-    Notebook::Ptr selectCalendars(sqlite3_stmt *stmt, bool *isDefault);
+    bool modifyCalendars(DBOperation dbop, sqlite3_stmt *stmt, bool isDefault);
 
     /*
       Update incidence data in Components table.
@@ -113,11 +103,9 @@ public:
       @param dbop database operation
       @return true if the operation was successful; false otherwise.
     */
-    bool modifyComponents(const KCalendarCore::Incidence &incidence, const QString &notebook,
-                          DBOperation dbop);
+    bool modifyComponents(const KCalendarCore::Incidence &incidence, DBOperation dbop);
 
-    bool purgeDeletedComponents(const KCalendarCore::Incidence &incidence,
-                                const QString &notebook = QString());
+    bool purgeDeletedComponents(const KCalendarCore::Incidence &incidence);
 
     /*
       Select incidences from Components table.
@@ -126,7 +114,7 @@ public:
       @param notebook notebook of incidence
       @return the queried incidence.
     */
-    KCalendarCore::Incidence::Ptr selectComponents(sqlite3_stmt *stmt1, QString &notebook);
+    KCalendarCore::Incidence::Ptr selectComponents(sqlite3_stmt *stmt1);
 
     bool selectMetadata(int *id);
     bool incrementTransactionId(int *id);

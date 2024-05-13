@@ -24,8 +24,6 @@
 
 #include "extendedstorage.h"
 #include "extendedcalendar.h"
-#include "notebook.h"
-
 
 /**
  * This module provides a simple storage abstraction which contains
@@ -37,13 +35,6 @@ class MKCAL_EXPORT DummyStorage : public mKCal::ExtendedStorage
 public:
     DummyStorage(const mKCal::ExtendedCalendar::Ptr &cal) : mKCal::ExtendedStorage(cal)
     {
-        mKCal::Notebook::Ptr nb = mKCal::Notebook::Ptr(new mKCal::Notebook("dummy-name",
-                                                                           "dummy-desc"));
-        bool r;
-        r = addNotebook(nb);
-        Q_ASSERT(r);
-        r = setDefaultNotebook(nb);
-        Q_ASSERT(r);
     }
 
     void calendarModified(bool, KCalendarCore::Calendar *)
@@ -89,10 +80,6 @@ public:
     {
         return true;
     }
-    bool loadNotebookIncidences(const QString &)
-    {
-        return true;
-    }
     bool purgeDeletedIncidences(const KCalendarCore::Incidence::List &, const QString &)
     {
         return true;
@@ -114,22 +101,6 @@ public:
         return true;
     }
     bool search(const QString &, QStringList *, int)
-    {
-        return true;
-    }
-    bool loadNotebooks()
-    {
-        return true;
-    }
-    bool insertNotebook(const mKCal::Notebook::Ptr &)
-    {
-        return true;
-    }
-    bool modifyNotebook(const mKCal::Notebook::Ptr &)
-    {
-        return true;
-    }
-    bool eraseNotebook(const mKCal::Notebook::Ptr &)
     {
         return true;
     }

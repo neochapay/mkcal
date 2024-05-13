@@ -127,24 +127,17 @@ Incidence::Ptr ExtendedCalendar::dissociateSingleOccurrence(const Incidence::Ptr
 
 bool ExtendedCalendar::addIncidence(const Incidence::Ptr &incidence)
 {
-    // Need to by-pass the override done in MemoryCalendar to get back
-    // the genericity of the call implemented in the Calendar class.
-    return Calendar::addIncidence(incidence);
-}
-
-bool ExtendedCalendar::addIncidence(const Incidence::Ptr &incidence, const QString &notebookUid)
-{
     if (!incidence) {
         return false;
     }
 
     switch (incidence->type()) {
     case IncidenceBase::TypeEvent:
-        return addEvent(incidence.staticCast<Event>(), notebookUid);
+        return addEvent(incidence.staticCast<Event>());
     case IncidenceBase::TypeTodo:
-        return addTodo(incidence.staticCast<Todo>(), notebookUid);
+        return addTodo(incidence.staticCast<Todo>());
     case IncidenceBase::TypeJournal:
-        return addJournal(incidence.staticCast<Journal>(), notebookUid);
+        return addJournal(incidence.staticCast<Journal>());
     default:
         qCWarning(lcMkcal) << "Unsupported type in addIncidence().";
     }
@@ -153,17 +146,7 @@ bool ExtendedCalendar::addIncidence(const Incidence::Ptr &incidence, const QStri
 
 bool ExtendedCalendar::addEvent(const Event::Ptr &aEvent)
 {
-    return addEvent(aEvent, defaultNotebook());
-}
-
-bool ExtendedCalendar::addEvent(const Event::Ptr &aEvent, const QString &notebookUid)
-{
     if (!aEvent) {
-        return false;
-    }
-
-    if (notebookUid.isEmpty()) {
-        qCWarning(lcMkcal) << "ExtendedCalendar::addEvent(): NotebookUid empty";
         return false;
     }
 
@@ -175,26 +158,12 @@ bool ExtendedCalendar::addEvent(const Event::Ptr &aEvent, const QString &noteboo
         return false;
     }
 
-    if (MemoryCalendar::addIncidence(aEvent)) {
-        return setNotebook(aEvent, notebookUid);
-    } else {
-        return false;
-    }
+    return MemoryCalendar::addIncidence(aEvent);
 }
 
 bool ExtendedCalendar::addTodo(const Todo::Ptr &aTodo)
 {
-    return addTodo(aTodo, defaultNotebook());
-}
-
-bool ExtendedCalendar::addTodo(const Todo::Ptr &aTodo, const QString &notebookUid)
-{
     if (!aTodo) {
-        return false;
-    }
-
-    if (notebookUid.isEmpty()) {
-        qCWarning(lcMkcal) << "ExtendedCalendar::addTodo(): NotebookUid empty";
         return false;
     }
 
@@ -213,26 +182,12 @@ bool ExtendedCalendar::addTodo(const Todo::Ptr &aTodo, const QString &notebookUi
         }
     }
 
-    if (MemoryCalendar::addIncidence(aTodo)) {
-        return setNotebook(aTodo, notebookUid);
-    } else {
-        return false;
-    }
+    return MemoryCalendar::addIncidence(aTodo);
 }
 
 bool ExtendedCalendar::addJournal(const Journal::Ptr &aJournal)
 {
-    return addJournal(aJournal, defaultNotebook());
-}
-
-bool ExtendedCalendar::addJournal(const Journal::Ptr &aJournal, const QString &notebookUid)
-{
     if (!aJournal) {
-        return false;
-    }
-
-    if (notebookUid.isEmpty()) {
-        qCWarning(lcMkcal) << "ExtendedCalendar::addJournal(): NotebookUid empty";
         return false;
     }
 
@@ -251,11 +206,7 @@ bool ExtendedCalendar::addJournal(const Journal::Ptr &aJournal, const QString &n
         }
     }
 
-    if (MemoryCalendar::addIncidence(aJournal)) {
-        return setNotebook(aJournal, notebookUid);
-    } else {
-        return false;
-    }
+    return MemoryCalendar::addIncidence(aJournal);
 }
 
 Incidence::List ExtendedCalendar::incidences(const QDate &start, const QDate &end)
@@ -273,14 +224,11 @@ ExtendedStorage::Ptr ExtendedCalendar::defaultStorage(const ExtendedCalendar::Pt
 Journal::List ExtendedCalendar::journals(const QDate &start, const QDate &end)
 {
     Journal::List journalList;
-    QDateTime startK(start);
-    QDateTime endK(end);
+    QDateTime startK(start.startOfDay());
+    QDateTime endK(end.endOfDay());
 
     const Journal::List journals(rawJournals());
     for (const Journal::Ptr &journal: journals) {
-        if (!isVisible(journal)) {
-            continue;
-        }
         QDateTime st = journal->dtStart();
         // If start time is not valid, try to use the creation time.
         if (!st.isValid())

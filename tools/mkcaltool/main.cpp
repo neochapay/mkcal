@@ -30,10 +30,9 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
 
     if (argc == 4 && 0 == ::strcmp(argv[1], "--reset-alarms")) {
-        QString notebookUid = argv[2];
-        QString eventUid = argv[3];
+        QString eventUid = argv[2];
         MkcalTool mkcalTool;
-        exit(mkcalTool.resetAlarms(notebookUid, eventUid));
+        exit(mkcalTool.resetAlarms(eventUid));
     }
     exit(0);
 }

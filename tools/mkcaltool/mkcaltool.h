@@ -32,7 +32,7 @@ class MkcalTool
 public:
     explicit MkcalTool();
 
-    int resetAlarms(const QString &notebookUid, const QString &eventUid);
+    int resetAlarms(const QString &eventUid);
 };
 
 #endif // MKCALTOOL_H

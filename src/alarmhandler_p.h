@@ -55,43 +55,12 @@ protected:
       setupAlarms() with several uids. If uid is empty, there is no guarantee
       given on the availablity of all incidences at the moment of the call.
 
-      @param notebookUid, return incidence belonging to this notebook.
       @param uid, when not empty, restrict the returned incidences to
              incidences sharing this UID.
       @returns a list of incidences with an alarm.
      */
-    virtual KCalendarCore::Incidence::List incidencesWithAlarms(const QString &notebookUid,
-                                                                const QString &uid = QString()) = 0;
-
-public:
-    /**
-      Remove alarms from a given notebook.
-
-      @param notebookUid, the notebook UID the alarms to remove belong to.
-      @param uid, when not empty, restrict the removal to incidences with this UID.
-      @returns true on success.
-     */
-    static bool clearAlarms(const QString &notebookUid, const QString &uid = QString());
-
-    /**
-      Create alarms for all incidence of a notebook, or to a series in this notebook.
-
-      @param notebookUid, the notebook UID the alarms to be create from.
-      @param uid, when not empty, create alarms only for incidence with this UID.
-      @returns true on success.
-     */
-    bool setupAlarms(const QString &notebookUid, const QString &uid = QString());
-
-    /**
-      Create alarms for a set of incidences known by the notebook
-      they belong to and their UID.
-
-      @param uids, a set of tuple (notebookUid, incidenceUid).
-      @returns true on success.
-     */
-    bool setupAlarms(const QSet<QPair<QString, QString>> &uids);
+    virtual KCalendarCore::Incidence::List incidencesWithAlarms(const QString &uid = QString()) = 0;
 };
-
 }
 
 #endif

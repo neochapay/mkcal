@@ -24,8 +24,6 @@
 
 #include <QtCore/QtPlugin>
 
-#include "notebook.h"
-
 class QString;
 
 /**
@@ -81,19 +79,6 @@ public:
     */
     virtual  bool multiCalendar() const = 0;
 
-    /** \brief returns the email address that is currently configured in the service,
-        it can be different per account.
-        @param notebook that we want to get the email of
-        @return email address of service
-    */
-    virtual QString emailAddress(const mKCal::Notebook::Ptr &notebook) = 0;
-
-    /** \brief returns the display name of account of service.
-        @param notebook that we want to get the display name of
-        @return display name of account of service
-    */
-    virtual QString displayName(const mKCal::Notebook::Ptr &notebook) const = 0;
-
     /** \brief Start the download of an attachment.
         This cannot be a blocking operation.
 
@@ -106,35 +91,20 @@ public:
         There has to be a signal also to notify that the
         More than one download at a time can be started.
 
-
-        @param notebook pointer to the notebook
         @param uri uri of attachment to be downloaded
         @param path path where attachment to be downloaded to
     @return True if OK, false otherwise.
     */
-    virtual bool downloadAttachment(const mKCal::Notebook::Ptr &notebook, const QString &uri, const QString &path) = 0;
+    virtual bool downloadAttachment(const QString &uri, const QString &path) = 0;
 
     /** \brief start the deletion of an attachment.
-        @param notebook pointer to the notebook
         @param incidence incidence of attachment to be deleted
         @param uri uri of attachment to be deleted
     @return True if OK, false otherwise.
     */
-    virtual bool deleteAttachment(const mKCal::Notebook::Ptr &notebook, const KCalendarCore::Incidence::Ptr &incidence,
+    virtual bool deleteAttachment(const KCalendarCore::Incidence::Ptr &incidence,
                                   const QString &uri) = 0;
 
-    /** \brief Share notebook.
-        @param notebook that we want to share
-        @param sharedWith email address or phone number of users
-        @return True if OK, false otherwise.
-    */
-    virtual bool shareNotebook(const mKCal::Notebook::Ptr &notebook, const QStringList &sharedWith) = 0;
-
-    /** \brief Returns list of emails, phones# of the persons that a notebook is shared with.
-        @param notebook pointer to the notebook
-        @return list of email addresses or phone numbers
-    */
-    virtual QStringList sharedWith(const mKCal::Notebook::Ptr &notebook) = 0;
 
     /** \brief The name of this service.
         It should be a uniq name specifying which service to use
@@ -143,13 +113,6 @@ public:
      */
     virtual QString serviceName() const = 0;
 
-    /** \brief A service might have a default Notebook in the set of notebooks supported
-        It can be a null value.
-        If multi Calendar is supported, in some situations it might be required to select
-        a default calendar from all of the ones supported. This function allows exactly that.
-        @return The name of the service.
-     */
-    virtual QString defaultNotebook() const = 0;
 
     /** \brief Checks if a give Product Id obtained in an iCal file is handled by this plugin.
         In some situations special behaviour might be needed for invitation from certain

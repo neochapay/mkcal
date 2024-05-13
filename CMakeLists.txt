@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(mkcal
+project(mkcal6
 	VERSION 0.7.22
 	DESCRIPTION "Mkcal calendar library")
 
@@ -18,26 +18,26 @@ include(FeatureSummary)
 include(GNUInstallDirs)
 include(ECMGeneratePkgConfigFile)
 
-option(BUILD_PLUGINS "Build plugin" ON)
-option(BUILD_TESTS "Build tests" ON)
+option(BUILD_PLUGINS "Build plugin" OFF)
+option(BUILD_TESTS "Build tests" OFF)
 option(INSTALL_TESTS "Install the tests to the system" OFF)
 option(BUILD_DOCUMENTATION "Build documentation" OFF)
 
 find_package(PkgConfig REQUIRED)
 
-set(QT_MIN_VERSION "5.6.0")
-find_package(Qt5 ${QT_MIN_VERSION} COMPONENTS DBus Gui Test REQUIRED)
-find_package(KF5 COMPONENTS CalendarCore REQUIRED)
+set(QT_MIN_VERSION "6.0.0")
+find_package(Qt6 ${QT_MIN_VERSION} COMPONENTS DBus Gui Test REQUIRED)
+find_package(KF6 COMPONENTS CalendarCore REQUIRED)
 
-pkg_check_modules(TIMED timed-qt5 IMPORTED_TARGET REQUIRED)
-set_property(GLOBAL APPEND PROPERTY _CMAKE_timed-qt5_TYPE REQUIRED)
+pkg_check_modules(TIMED timed-qt6 IMPORTED_TARGET REQUIRED)
+set_property(GLOBAL APPEND PROPERTY _CMAKE_timed-qt6_TYPE REQUIRED)
 pkg_check_modules(SQLITE3 sqlite3 IMPORTED_TARGET REQUIRED)
 set_property(GLOBAL APPEND PROPERTY _CMAKE_sqlite3_TYPE REQUIRED)
 
 if(TIMED_FOUND)
-	set_property(GLOBAL APPEND PROPERTY PACKAGES_FOUND timed-qt5)
+	set_property(GLOBAL APPEND PROPERTY PACKAGES_FOUND timed-qt6)
 else()
-	set_property(GLOBAL APPEND PROPERTY PACKAGES_NOT_FOUND timed-qt5)
+	set_property(GLOBAL APPEND PROPERTY PACKAGES_NOT_FOUND timed-qt6)
 endif()
 if(SQLITE3_FOUND)
 	set_property(GLOBAL APPEND PROPERTY PACKAGES_FOUND sqlite3)

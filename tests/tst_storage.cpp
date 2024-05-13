@@ -34,7 +34,7 @@
 #include "sqlitestorage.h"
 #include "sqliteformat.h"
 #ifdef TIMED_SUPPORT
-#include <timed-qt5/interface.h>
+#include <timed-qt6/interface.h>
 #include <QtCore/QMap>
 #include <QtDBus/QDBusReply>
 using namespace Maemo;
@@ -51,36 +51,24 @@ tst_storage::tst_storage(QObject *parent)
 void tst_storage::initTestCase()
 {
     ExtendedCalendar::Ptr dummyCal(new ExtendedCalendar(QTimeZone::systemTimeZone()));
-    DummyStorage dummy(dummyCal);
-    QVERIFY(dummy.open());
+    DummyStorage dummyStorage(dummyCal);
+    QVERIFY(dummyStorage.open());
 
     openDb(true);
 }
 
-void tst_storage::cleanupTestCase()
-{
-    mKCal::Notebook::Ptr notebook = m_storage->notebook(NotebookId);
-    if (notebook)
-        QVERIFY(m_storage->deleteNotebook(notebook));
-}
 
 void tst_storage::init()
 {
     openDb(true);
 }
 
-void tst_storage::cleanup()
-{
-    mKCal::Notebook::Ptr notebook = m_storage->notebook(NotebookId);
-    if (notebook)
-        QVERIFY(m_storage->deleteNotebook(notebook));
-}
 
 void tst_storage::tst_timezone()
 {
     // for test sanity, verify kdatetime actually agrees timezone is for helsinki.
     QDateTime localTime(QDate(2014, 1, 1), QTime(), QTimeZone("Europe/Helsinki"));
-    QCOMPARE(localTime.utcOffset(), 7200);
+    QCOMPARE(localTime.offsetFromUtc(), 7200);
 }
 
 Q_DECLARE_METATYPE(QDateTime)
@@ -93,7 +81,7 @@ void tst_storage::tst_veventdtstart_data()
     QTest::newRow("clock time") << QDateTime(QDate(2020, 5, 29), QTime(10, 15), Qt::LocalTime);
     QTest::newRow("UTC") << QDateTime(QDate(2020, 5, 29), QTime(10, 15), Qt::UTC);
     QTest::newRow("time zone") << QDateTime(QDate(2020, 5, 29), QTime(10, 15), QTimeZone("Europe/Paris"));
-    QTest::newRow("date only") << QDateTime(QDate(2020, 5, 29));
+    QTest::newRow("date only") << QDateTime(QDate(2020, 5, 29).startOfDay());
     QTest::newRow("origin date time") << format.fromOriginTime(0);
     // Not allowed by RFC, will be converted to origin of time after save.
     QTest::newRow("bogus QDateTime") << QDateTime();
@@ -106,7 +94,7 @@ void tst_storage::tst_veventdtstart()
     KCalendarCore::Event::Ptr event = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
     event->setDtStart(startDateTime);
 
-    m_calendar->addEvent(event, NotebookId);
+    m_calendar->addEvent(event);
     m_storage->save();
     QString uid = event->uid();
     reloadDb();
@@ -168,7 +156,7 @@ void tst_storage::tst_allday()
         QCOMPARE(event->hasEndDate(), false);
     }
 
-    m_calendar->addEvent(event, NotebookId);
+    m_calendar->addEvent(event);
     m_storage->save();
     QString uid = event->uid();
     const QDate from(2012, 1, 1);
@@ -210,7 +198,7 @@ void tst_storage::tst_alldayUtc()
     QCOMPARE(event->allDay(), true);
     QCOMPARE(event->dtStart().timeSpec(), Qt::UTC);
 
-    m_calendar->addEvent(event, NotebookId);
+    m_calendar->addEvent(event);
     m_storage->save();
     QString uid = event->uid();
     reloadDb();
@@ -234,7 +222,7 @@ void tst_storage::tst_alldayRecurrence()
     auto event = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
 
     QDate startDate(2013, 12, 1);
-    event->setDtStart(QDateTime(startDate));
+    event->setDtStart(QDateTime(startDate.startOfDay()));
     event->setAllDay(true);
 
     KCalendarCore::Recurrence *recurrence = event->recurrence();
@@ -243,7 +231,7 @@ void tst_storage::tst_alldayRecurrence()
     recurrence->setAllDay(true);
     recurrence->addRDate(startDate.addDays(2));
 
-    m_calendar->addEvent(event, NotebookId);
+    m_calendar->addEvent(event);
     m_storage->save();
     QString uid = event->uid();
     reloadDb();
@@ -2279,20 +2267,6 @@ void tst_storage::tst_storageObserver()
     QVERIFY(modified.isEmpty());
     QVERIFY(!modified.wait(200));
 
-    mKCal::Notebook::Ptr notebook(new mKCal::Notebook(QString::fromLatin1("signals"),
-                                                      QString()));
-    m_storage->addNotebook(notebook);
-    QVERIFY(modified.isEmpty());
-    QVERIFY(!modified.wait(200));
-
-    notebook->setDescription(QString::fromLatin1("testing signals"));
-    m_storage->updateNotebook(notebook);
-    QVERIFY(modified.isEmpty());
-    QVERIFY(!modified.wait(200));
-
-    m_storage->deleteNotebook(notebook);
-    QVERIFY(modified.isEmpty());
-    QVERIFY(!modified.wait(200));
 
     mKCal::ExtendedCalendar::Ptr calendar(new mKCal::ExtendedCalendar(QTimeZone::systemTimeZone()));
     mKCal::ExtendedStorage::Ptr storage = mKCal::ExtendedCalendar::defaultStorage(calendar);

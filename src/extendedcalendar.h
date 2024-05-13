@@ -199,8 +199,6 @@
 namespace mKCal {
 
 class ExtendedStorage;
-class Notebook;
-
 /**
   @brief
   This class provides a calendar cached into memory.
@@ -262,17 +260,6 @@ public:
     */
     bool addIncidence(const KCalendarCore::Incidence::Ptr &incidence);
 
-    /**
-      @copydoc
-      Calendar::addIncidence()
-
-      @param notebookUid The notebook uid where you want to add the incidence to.
-
-      @warning There is no check if the notebookUid is valid or not. If it is not
-      valid you can corrupt the DB. Check before with storage::isValidNotebook()
-    */
-    bool addIncidence(const KCalendarCore::Incidence::Ptr &incidence, const QString &notebookUid);
-
     // Event Specific Methods //
 
     /**
@@ -280,17 +267,6 @@ public:
       Calendar::addEvent()
     */
     bool addEvent(const KCalendarCore::Event::Ptr &event);
-
-    /**
-      @copydoc
-      Calendar::addEvent()
-
-      @param notebookUid The notebook uid where you want to add the event to.
-
-      @warning There is now check if the notebookUid is valid or not. If it is not
-      valid you can corrupt the DB. Check before with storage::isValidNotebook()
-    */
-    bool addEvent(const KCalendarCore::Event::Ptr &event, const QString &notebookUid);
 
     // To-do Specific Methods //
 
@@ -300,35 +276,12 @@ public:
     */
     bool addTodo(const KCalendarCore::Todo::Ptr &todo);
 
-    /**
-      @copydoc
-      Calendar::addTodo()
-
-      @param notebookUid The notebook uid where you want to add the Todo to.
-
-      @warning There is now check if the notebookUid is valid or not. If it is not
-      valid you can corrupt the DB. Check before with storage::isValidNotebook()
-    */
-    bool addTodo(const KCalendarCore::Todo::Ptr &todo, const QString &notebookUid);
-
     // Journal Specific Methods //
-
     /**
       @copydoc
       Calendar::addJournal()
     */
     bool addJournal(const KCalendarCore::Journal::Ptr &journal);
-
-    /**
-      @copydoc
-      Calendar::addJournal()
-
-      @param notebookUid The notebook uid where you want to add the Journal to.
-
-      @warning There is now check if the notebookUid is valid or not. If it is not
-      valid you can corrupt the DB. Check before with storage::isValidNotebook()
-    */
-    bool addJournal(const KCalendarCore::Journal::Ptr &journal, const QString &notebookUid);
 
     using KCalendarCore::Calendar::journals;
 

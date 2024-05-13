@@ -53,12 +53,11 @@ public:
     /** \brief Send a new Invitation to all the participants.
 
         @param accountId The unique id of the account
-        @param notebookUid notebook uid of incidence
         @param invitation Pointer to the incidence that we want to send
         @param body The body of the reply, if any
         @return True if OK, false otherwise.
     */
-  virtual bool sendInvitation(const QString &accountId, const QString &notebookUid, const KCalendarCore::Incidence::Ptr &invitation, const QString &body) =0;
+  virtual bool sendInvitation(const QString &accountId, const KCalendarCore::Incidence::Ptr &invitation, const QString &body) =0;
 
     /** \brief Send a updated invitation to all the participants.
         This is used for updating invitations we sent earlier.

@@ -28,58 +28,18 @@ using namespace mKCal;
 using namespace KCalendarCore;
 
 #ifdef TIMED_SUPPORT
-# include <timed-qt5/interface.h>
-# include <timed-qt5/event-declarations.h>
-# include <timed-qt5/exception.h>
+# include <timed-qt6/interface.h>
+# include <timed-qt6/event-declarations.h>
+# include <timed-qt6/exception.h>
 # include <QtCore/QMap>
 # include <QtDBus/QDBusReply>
 using namespace Maemo;
 static const QLatin1String RESET_ALARMS_CMD("invoker --type=generic -n /usr/bin/mkcaltool --reset-alarms");
 #endif
 
-bool AlarmHandler::clearAlarms(const QString &notebookUid, const QString &uid)
-{
-#if defined(TIMED_SUPPORT)
-    Timed::Interface timed;
-    if (!timed.isValid()) {
-        qCWarning(lcMkcal) << "cannot clear alarms,"
-                 << "timed interface is not valid" << timed.lastError();
-        return false;
-    }
-
-    QMap<QString, QVariant> query;
-    query["APPLICATION"] = "libextendedkcal";
-    query["notebook"] = notebookUid;
-    if (!uid.isEmpty()) {
-        query["uid"] = uid;
-    }
-    QDBusReply<QList<QVariant> > reply = timed.query_sync(query);
-    if (!reply.isValid()) {
-        qCWarning(lcMkcal) << "cannot get alarm cookies" << timed.lastError();
-        return false;
-    }
-    QList<uint> cookies;
-    for (const QVariant &variant : reply.value()) {
-        cookies.append(variant.toUInt());
-    }
-    if (!cookies.isEmpty()) {
-        QDBusReply<QList<uint>> reply = timed.cancel_events_sync(cookies);
-        if (!reply.isValid() || !reply.value().isEmpty()) {
-            qCWarning(lcMkcal) << "cannot remove alarms" << cookies;
-        }
-    }
-#endif
-    return true;
-}
-
 static bool cancelAlarms(const QSet<QPair<QString, QString>> &uids)
 {
 #if defined(TIMED_SUPPORT)
-    if (uids.count() == 1) {
-        QPair<QString, QString> id = uids.values()[0];
-        return AlarmHandler::clearAlarms(id.first, id.second);
-    }
-
     Timed::Interface timed;
     if (!timed.isValid()) {
         qCWarning(lcMkcal) << "cannot clear alarms,"
@@ -107,15 +67,11 @@ static bool cancelAlarms(const QSet<QPair<QString, QString>> &uids)
     const QMap<uint, QMap<QString,QString> > map = attributes.value();
     for (QMap<uint, QMap<QString,QString> >::ConstIterator it = map.constBegin();
          it != map.constEnd(); it++) {
-        const QString notebook = it.value()["notebook"];
         const QString uid = it.value()["uid"];
-
-        if (uids.contains(QPair<QString, QString>(notebook, uid))
-            || uids.contains(QPair<QString, QString>(notebook, QString()))) {
-            qCDebug(lcMkcal) << "removing alarm" << it.key() << notebook << uid;
-            cookiesDoomed.append(it.key());
-        }
+        qCDebug(lcMkcal) << "removing alarm" << it.key() << uid;
+        cookiesDoomed.append(it.key());
     }
+
     if (!cookiesDoomed.isEmpty()) {
         QDBusReply<QList<uint>> reply = timed.cancel_events_sync(cookiesDoomed);
         if (!reply.isValid() || !reply.value().isEmpty()) {
@@ -140,8 +96,7 @@ static QDateTime getNextOccurrence(const Recurrence *recurrence,
     return match;
 }
 
-static void addAlarms(Timed::Event::List *events,
-                      const QString &notebookUid, const Incidence &incidence,
+static void addAlarms(Timed::Event::List *events, const Incidence &incidence,
                       const QDateTime &laterThan)
 {
     if (incidence.status() == Incidence::StatusCanceled || laterThan.isNull()) {
@@ -178,7 +133,7 @@ static void addAlarms(Timed::Event::List *events,
         Timed::Event &e = events->append();
         e.setUserModeFlag();
         e.setMaximalTimeoutSnoozeCounter(2);
-        e.setTicker(alarmTime.toUTC().toTime_t());
+        e.setTicker(alarmTime.toUTC().toMSecsSinceEpoch());
         // The code'll crash (=exception) iff the content is empty. So
         // we have to check here.
         QString s;
@@ -206,7 +161,6 @@ static void addAlarms(Timed::Event::List *events,
             Timed::Event::Action &a = e.addAction();
             a.runCommand(QString("%1 %2 %3")
                          .arg(RESET_ALARMS_CMD)
-                         .arg(notebookUid)
                          .arg(incidence.uid()));
             a.whenServed();
         }
@@ -239,7 +193,6 @@ static void addAlarms(Timed::Event::List *events,
         if (incidence.hasRecurrenceId()) {
             e.setAttribute("recurrenceId", incidence.recurrenceId().toString(Qt::ISODate));
         }
-        e.setAttribute("notebook", notebookUid);
 
         if (alarm->type() == Alarm::Procedure) {
             QString prog = alarm->programFile();
@@ -255,66 +208,3 @@ static void addAlarms(Timed::Event::List *events,
     }
 }
 #endif
-
-bool AlarmHandler::setupAlarms(const QString &notebookUid, const QString &uid)
-{
-    QSet<QPair<QString, QString>> uids;
-    uids.insert(QPair<QString, QString>(notebookUid, uid));
-    return setupAlarms(uids);
-}
-
-bool AlarmHandler::setupAlarms(const QSet<QPair<QString, QString>> &uids)
-{
-#if defined(TIMED_SUPPORT)
-    cancelAlarms(uids);
-
-    const QDateTime now = QDateTime::currentDateTime();
-    Timed::Event::List events;
-    for (QSet<QPair<QString, QString>>::ConstIterator it = uids.constBegin();
-         it != uids.constEnd(); it++) {
-        Incidence::List list = incidencesWithAlarms(it->first, it->second);
-        QSet<QDateTime> recurrenceIds;
-        for (Incidence::List::ConstIterator inc = list.constBegin();
-             inc != list.constEnd(); inc++) {
-            if ((*inc)->hasRecurrenceId()) {
-                recurrenceIds.insert((*inc)->recurrenceId());
-            }
-        }
-        for (Incidence::List::ConstIterator inc = list.constBegin();
-             inc != list.constEnd(); inc++) {
-            if ((*inc)->recurs()) {
-                addAlarms(&events, it->first, **inc,
-                          getNextOccurrence((*inc)->recurrence(), now, recurrenceIds));
-            } else {
-                addAlarms(&events, it->first, **inc, now);
-            }
-        }
-    }
-    if (events.count() > 0) {
-        Timed::Interface timed;
-        if (!timed.isValid()) {
-            qCWarning(lcMkcal) << "cannot set alarm for incidence: "
-                               << "alarm interface is not valid" << timed.lastError();
-            return false;
-        }
-        QDBusReply < QList<QVariant> > reply = timed.add_events_sync(events);
-        if (reply.isValid()) {
-            foreach (QVariant v, reply.value()) {
-                bool ok = true;
-                uint cookie = v.toUInt(&ok);
-                if (ok && cookie) {
-                    qCDebug(lcMkcal) << "added alarm: " << cookie;
-                } else {
-                    qCWarning(lcMkcal) << "failed to add alarm";
-                }
-            }
-        } else {
-            qCWarning(lcMkcal) << "failed to add alarms: " << reply.error().message();
-            return false;
-        }
-    } else {
-        qCDebug(lcMkcal) << "No alarms to send";
-    }
-#endif
-    return true;
-}

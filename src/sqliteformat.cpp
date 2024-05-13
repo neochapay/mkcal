@@ -66,7 +66,6 @@ public:
         sqlite3_finalize(mSelectIncRDates);
         sqlite3_finalize(mSelectIncAttachments);
         sqlite3_finalize(mSelectDeletedIncidences);
-        sqlite3_finalize(mSelectDeletedIncidencesFromNotebook);
         sqlite3_finalize(mDeleteIncComponents);
         sqlite3_finalize(mDeleteIncProperties);
         sqlite3_finalize(mDeleteIncAttendees);
@@ -102,7 +101,6 @@ public:
     sqlite3_stmt *mSelectIncAttachments = nullptr;
 
     sqlite3_stmt *mSelectDeletedIncidences = nullptr;
-    sqlite3_stmt *mSelectDeletedIncidencesFromNotebook = nullptr;
 
     sqlite3_stmt *mDeleteIncComponents = nullptr;
     sqlite3_stmt *mDeleteIncProperties = nullptr;
@@ -126,14 +124,13 @@ public:
 
     bool updateMetadata(int transactionId);
     bool selectCustomproperties(Incidence::Ptr &incidence, int rowid);
-    int selectRowId(const QString &notebookUid, const QString &uid,
+    int selectRowId(const QString &uid,
                     const QDateTime &recId);
     bool selectRecursives(Incidence::Ptr &incidence, int rowid);
     bool selectAlarms(Incidence::Ptr &incidence, int rowid);
     bool selectAttendees(Incidence::Ptr &incidence, int rowid);
     bool selectRdates(Incidence::Ptr &incidence, int rowid);
     bool selectAttachments(Incidence::Ptr &incidence, int rowid);
-    bool selectCalendarProperties(Notebook::Ptr notebook);
     bool insertCustomproperties(const Incidence &incidence, int rowid);
     bool insertCustomproperty(int rowid, const QByteArray &key, const QString &value, const QString &parameters);
     bool insertAttendees(const Incidence &incidence, int rowid);
@@ -146,7 +143,7 @@ public:
     bool insertRdates(const Incidence &incidence, int rowid);
     bool insertRdate(int rowid, int type, const QDateTime &rdate, bool allDay);
     bool deleteListsForIncidence(int rowid);
-    bool modifyCalendarProperties(const Notebook &notebook, DBOperation dbop);
+    bool modifyCalendarProperties(DBOperation dbop);
     bool deleteCalendarProperties(const QByteArray &id);
     bool insertCalendarProperty(const QByteArray &id, const QByteArray &key,
                                 const QByteArray &value);
@@ -223,25 +220,16 @@ error:
     return false;
 }
 
-bool SqliteFormat::modifyCalendars(const Notebook &notebook,
-                                   DBOperation dbop, sqlite3_stmt *stmt, bool isDefault)
+bool SqliteFormat::modifyCalendars(DBOperation dbop, sqlite3_stmt *stmt, bool isDefault)
 {
     int rv = 0;
     int index = 1;
-    QByteArray uid = notebook.uid().toUtf8();
-    QByteArray name = notebook.name().toUtf8();
-    QByteArray description = notebook.description().toUtf8();
-    QByteArray color = notebook.color().toUtf8();
-    QByteArray plugin = notebook.pluginName().toUtf8();
-    QByteArray account = notebook.account().toUtf8();
-    QByteArray sharedWith = notebook.sharedWithStr().toUtf8();
-    QByteArray syncProfile = notebook.syncProfile().toUtf8();
 
     sqlite3_int64  secs;
 
     index = 1;
     if (dbop == DBInsert || dbop == DBDelete)
-        SL3_bind_text(stmt, index, uid, uid.length(), SQLITE_STATIC);
+        SL3_bind_text(stmt, index, "", 0, SQLITE_STATIC);
 
     if (dbop == DBInsert || dbop == DBUpdate) {
         int flags = 0;
@@ -256,40 +244,15 @@ bool SqliteFormat::modifyCalendars(const Notebook &notebook,
             sqlite3_finalize(unset);
             flags |= SqliteFormat::Default;
         }
-        flags |= notebook.eventsAllowed() ? SqliteFormat::AllowEvents : 0;
-        flags |= notebook.todosAllowed() ? SqliteFormat::AllowTodos : 0;
-        flags |= notebook.journalsAllowed() ? SqliteFormat::AllowJournals : 0;
-        flags |= notebook.isShared() ? SqliteFormat::Shared : 0;
-        flags |= notebook.isMaster() ? SqliteFormat::Master : 0;
-        flags |= notebook.isSynchronized() ? SqliteFormat::Synchronized : 0;
-        flags |= notebook.isReadOnly() ? SqliteFormat::ReadOnly : 0;
-        flags |= notebook.isVisible() ? SqliteFormat::Visible : 0;
-        flags |= notebook.isRunTimeOnly() ? SqliteFormat::RunTimeOnly : 0;
-        flags |= notebook.isShareable() ? SqliteFormat::Shareable : 0;
-        SL3_bind_text(stmt, index, name, name.length(), SQLITE_STATIC);
-        SL3_bind_text(stmt, index, description, description.length(), SQLITE_STATIC);
-        SL3_bind_text(stmt, index, color, color.length(), SQLITE_STATIC);
-        SL3_bind_int(stmt, index, flags);
-        secs = toOriginTime(notebook.syncDate().toUTC());
-        SL3_bind_int64(stmt, index, secs);
-        SL3_bind_text(stmt, index, plugin, plugin.length(), SQLITE_STATIC);
-        SL3_bind_text(stmt, index, account, account.length(), SQLITE_STATIC);
-        SL3_bind_int64(stmt, index, notebook.attachmentSize());
-        secs = toOriginTime(notebook.modifiedDate().toUTC());
-        SL3_bind_int64(stmt, index, secs);
-        SL3_bind_text(stmt, index, sharedWith, sharedWith.length(), SQLITE_STATIC);
-        SL3_bind_text(stmt, index, syncProfile, syncProfile.length(), SQLITE_STATIC);
-        secs = toOriginTime(notebook.creationDate().toUTC());
-        SL3_bind_int64(stmt, index, secs);
 
-        if (dbop == DBUpdate)
-            SL3_bind_text(stmt, index, uid, uid.length(), SQLITE_STATIC);
+        SL3_bind_int(stmt, index, flags);
+        SL3_bind_int64(stmt, index, secs);
     }
 
     SL3_step(stmt);
 
-    if (!d->modifyCalendarProperties(notebook, dbop)) {
-        qCWarning(lcMkcal) << "failed to modify calendarproperties for notebook" << uid;
+    if (!d->modifyCalendarProperties(dbop)) {
+        qCWarning(lcMkcal) << "failed to modify calendarproperties";
     }
 
     return true;
@@ -299,12 +262,11 @@ error:
     return false;
 }
 
-bool SqliteFormat::purgeDeletedComponents(const KCalendarCore::Incidence &incidence, const QString &notebook)
+bool SqliteFormat::purgeDeletedComponents(const KCalendarCore::Incidence &incidence)
 {
     int rv;
     int index = 1;
     const QByteArray uid(incidence.uid().toUtf8());
-    const QByteArray nbUid(notebook.toUtf8());
     qint64 secsRecurId = 0;
 
     if (incidence.hasRecurrenceId() && incidence.recurrenceId().timeSpec() == Qt::LocalTime) {
@@ -325,21 +287,9 @@ bool SqliteFormat::purgeDeletedComponents(const KCalendarCore::Incidence &incide
         SL3_prepare_v2(d->mDatabase, query, qsize, &d->mSelectDeletedIncidences, nullptr);
     }
 
-    if (!d->mSelectDeletedIncidencesFromNotebook) {
-        const char *query = SELECT_COMPONENTS_BY_NOTEBOOK_UID_RECID_AND_DELETED;
-        int qsize = sizeof(SELECT_COMPONENTS_BY_NOTEBOOK_UID_RECID_AND_DELETED);
-        SL3_prepare_v2(d->mDatabase, query, qsize, &d->mSelectDeletedIncidencesFromNotebook, nullptr);
-    }
     sqlite3_stmt *stmt;
-    if (notebook.isEmpty()) {
-        stmt = d->mSelectDeletedIncidences;
-    } else {
-        stmt = d->mSelectDeletedIncidencesFromNotebook;
-    }
+    stmt = d->mSelectDeletedIncidences;
     SL3_reset(stmt);
-    if (!nbUid.isEmpty()) {
-        SL3_bind_text(stmt, index, nbUid.constData(), nbUid.length(), SQLITE_STATIC);
-    }
     SL3_bind_text(stmt, index, uid.constData(), uid.length(), SQLITE_STATIC);
     SL3_bind_int64(stmt, index, secsRecurId);
 
@@ -400,13 +350,12 @@ static bool setDateTime(SqliteFormat *format, sqlite3_stmt *stmt, int &index, co
             goto error;                                                \
     }
 
-bool SqliteFormat::modifyComponents(const Incidence &incidence, const QString &nbook,
+bool SqliteFormat::modifyComponents(const Incidence &incidence,
                                     DBOperation dbop)
 {
     int rv = 0;
     int index = 1;
     QByteArray uid;
-    QByteArray notebook;
     QByteArray type;
     QByteArray summary;
     QByteArray category;
@@ -426,12 +375,12 @@ bool SqliteFormat::modifyComponents(const Incidence &incidence, const QString &n
     // Don't leave deleted events with the same UID/recID in the
     // notebook to add a new incidence to. It may otherwise
     // confuse sync processes, getting both added and deleted events.
-    if (dbop == DBInsert && !purgeDeletedComponents(incidence, nbook)) {
+    if (dbop == DBInsert && !purgeDeletedComponents(incidence)) {
         qCWarning(lcMkcal) << "cannot purge deleted components on insertion.";
     }
 
     if (dbop == DBDelete || dbop == DBMarkDeleted || dbop == DBUpdate) {
-        rowid = d->selectRowId(nbook, incidence.uid(), incidence.recurrenceId());
+        rowid = d->selectRowId(incidence.uid(), incidence.recurrenceId());
         if (!rowid && dbop == DBDelete) {
             // Already deleted.
             return true;
@@ -488,8 +437,7 @@ bool SqliteFormat::modifyComponents(const Incidence &incidence, const QString &n
     }
 
     if (dbop == DBInsert || dbop == DBUpdate) {
-        notebook = nbook.toUtf8();
-        SL3_bind_text(stmt1, index, notebook.constData(), notebook.length(), SQLITE_STATIC);
+        SL3_bind_text(stmt1, index, "", 0, SQLITE_STATIC);
 
         switch (incidence.type()) {
         case Incidence::TypeEvent:
@@ -820,7 +768,8 @@ bool SqliteFormat::Private::insertRdates(const Incidence &incidence, int rowid)
     DateList dateList = incidence.recurrence()->rDates();
     DateList::ConstIterator dt;
     for (dt = dateList.constBegin(); dt != dateList.constEnd(); ++dt) {
-        if (!insertRdate(rowid, type, QDateTime((*dt)), true)) {
+        QDate date = *dt;
+        if (!insertRdate(rowid, type, date.startOfDay(), true)) {
             qCWarning(lcMkcal) << "failed to modify rdates for incidence" << incidence.uid();
             success = false;
         }
@@ -829,7 +778,8 @@ bool SqliteFormat::Private::insertRdates(const Incidence &incidence, int rowid)
     type = SqliteFormat::XDate;
     dateList = incidence.recurrence()->exDates();
     for (dt = dateList.constBegin(); dt != dateList.constEnd(); ++dt) {
-        if (!insertRdate(rowid, type, QDateTime((*dt)), true)) {
+        QDate date = *dt;
+        if (!insertRdate(rowid, type,  date.startOfDay(), true)) {
             qCWarning(lcMkcal) << "failed to modify xdates for incidence" << incidence.uid();
             success = false;
         }
@@ -1251,27 +1201,14 @@ error:
     return false;
 }
 
-bool SqliteFormat::Private::modifyCalendarProperties(const Notebook &notebook, DBOperation dbop)
+bool SqliteFormat::Private::modifyCalendarProperties(DBOperation dbop)
 {
-    QByteArray id(notebook.uid().toUtf8());
     // In Update always delete all first then insert all
-    if (dbop == DBUpdate && !deleteCalendarProperties(id)) {
-        qCWarning(lcMkcal) << "failed to delete calendarproperties for notebook" << id;
+    if (dbop == DBUpdate) {
+        qCWarning(lcMkcal) << "failed to delete calendarproperties";
         return false;
     }
-
-    bool success = true;
-    if (dbop == DBInsert || dbop == DBUpdate) {
-        QList<QByteArray> properties = notebook.customPropertyKeys();
-        for (QList<QByteArray>::ConstIterator it = properties.constBegin();
-             it != properties.constEnd(); ++it) {
-            if (!insertCalendarProperty(id, *it, notebook.customProperty(*it).toUtf8())) {
-                qCWarning(lcMkcal) << "failed to insert calendarproperty" << *it << "in notebook" << id;
-                success = false;
-            }
-        }
-    }
-    return success;
+    return true;
 }
 
 bool SqliteFormat::Private::deleteCalendarProperties(const QByteArray &id)
@@ -1322,76 +1259,6 @@ error:
 }
 //@endcond
 
-Notebook::Ptr SqliteFormat::selectCalendars(sqlite3_stmt *stmt, bool *isDefault)
-{
-    int rv = 0;
-    Notebook::Ptr notebook;
-    sqlite3_int64 date;
-    QDateTime syncDate = QDateTime();
-    QDateTime modifiedDate = QDateTime();
-    QDateTime creationDate = QDateTime();
-
-    SL3_step(stmt);
-
-    *isDefault = false;
-    if (rv == SQLITE_ROW) {
-        QString id = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 0));
-        QString name = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 1));
-        QString description = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 2));
-        QString color = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 3));
-        int flags = (int)sqlite3_column_int(stmt, 4);
-        date = sqlite3_column_int64(stmt, 5);
-        QString plugin = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 6));
-        QString account = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 7));
-        int attachmentSize = sqlite3_column_int(stmt, 8);
-        if (date)
-            syncDate = fromOriginTime(date);
-        date = sqlite3_column_int64(stmt, 9);
-        if (date)
-            modifiedDate = fromOriginTime(date);
-        QString sharedWith = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 10));
-        QString syncProfile = QString::fromUtf8((const char *)sqlite3_column_text(stmt, 11));
-        date = sqlite3_column_int64(stmt, 12);
-        if (date)
-            creationDate = fromOriginTime(date);
-
-        notebook = Notebook::Ptr(new Notebook(name, description));
-        notebook->setUid(id);
-        notebook->setColor(color);
-        notebook->setEventsAllowed(flags & SqliteFormat::AllowEvents);
-        notebook->setTodosAllowed(flags & SqliteFormat::AllowTodos);
-        notebook->setJournalsAllowed(flags & SqliteFormat::AllowJournals);
-        notebook->setIsShared(flags & SqliteFormat::Shared);
-        notebook->setIsMaster(flags & SqliteFormat::Master);
-        notebook->setIsSynchronized(flags & SqliteFormat::Synchronized);
-        notebook->setIsReadOnly(flags & SqliteFormat::ReadOnly);
-        notebook->setIsVisible(flags & SqliteFormat::Visible);
-        notebook->setRunTimeOnly(flags & SqliteFormat::RunTimeOnly);
-        notebook->setIsShareable(flags & SqliteFormat::Shareable);
-        notebook->setPluginName(plugin);
-        notebook->setAccount(account);
-        notebook->setAttachmentSize(attachmentSize);
-        notebook->setSyncDate(syncDate);
-        notebook->setSharedWithStr(sharedWith);
-        notebook->setSyncProfile(syncProfile);
-        notebook->setCreationDate(creationDate);
-
-        if (!d->selectCalendarProperties(notebook)) {
-            qCWarning(lcMkcal) << "failed to get calendarproperties for notebook" << id;
-        }
-
-        // This has to be called last! Otherwise the last modified date
-        // will be roughly now, and not whenever notebook was really last
-        // modified.
-        notebook->setModifiedDate(modifiedDate);
-
-        *isDefault = flags & SqliteFormat::Default;
-    }
-
-error:
-    return notebook;
-}
-
 static QDateTime getDateTime(SqliteFormat *format, sqlite3_stmt *stmt, int index, bool *isDate = 0)
 {
     sqlite3_int64 date;
@@ -1432,7 +1299,7 @@ static QDateTime getDateTime(SqliteFormat *format, sqlite3_stmt *stmt, int index
     return dateTime;
 }
 
-Incidence::Ptr SqliteFormat::selectComponents(sqlite3_stmt *stmt1, QString &notebook)
+Incidence::Ptr SqliteFormat::selectComponents(sqlite3_stmt *stmt1)
 {
     int rv = 0;
     int index = 0;
@@ -1519,8 +1386,6 @@ Incidence::Ptr SqliteFormat::selectComponents(sqlite3_stmt *stmt1, QString &note
 
         // Set common Incidence data.
         rowid = sqlite3_column_int(stmt1, index++);
-
-        notebook = QString::fromUtf8((const char *)sqlite3_column_text(stmt1, index++));
 
         index++;
 
@@ -1637,7 +1502,6 @@ Incidence::Ptr SqliteFormat::selectComponents(sqlite3_stmt *stmt1, QString &note
         index++; // extra2
         index++; // extra3
         incidence->setThisAndFuture(sqlite3_column_int(stmt1, index++));
-//    kDebug() << "loaded component for incidence" << incidence->uid() << "notebook" << notebook;
 
         if (!d->selectCustomproperties(incidence, rowid)) {
             qCWarning(lcMkcal) << "failed to get customproperties for incidence" << incidence->uid();
@@ -1672,8 +1536,7 @@ error:
 }
 
 //@cond PRIVATE
-int SqliteFormat::Private::selectRowId(const QString &notebookUid,
-                                       const QString &uid,
+int SqliteFormat::Private::selectRowId(const QString &uid,
                                        const QDateTime &recId)
 {
     int rv = 0;
@@ -1682,7 +1545,6 @@ int SqliteFormat::Private::selectRowId(const QString &notebookUid,
     int qsize = 0;
     sqlite3_stmt *stmt = NULL;
 
-    const QByteArray n = notebookUid.toUtf8();
     const QByteArray u = uid.toUtf8();
     int rowid = 0;
 
@@ -1690,7 +1552,6 @@ int SqliteFormat::Private::selectRowId(const QString &notebookUid,
     qsize = sizeof(SELECT_ROWID_FROM_COMPONENTS_BY_NOTEBOOK_UID_AND_RECURID);
 
     SL3_prepare_v2(mDatabase, query, qsize, &stmt, NULL);
-    SL3_bind_text(stmt, index, n.constData(), n.length(), SQLITE_STATIC);
     SL3_bind_text(stmt, index, u.constData(), u.length(), SQLITE_STATIC);
     if (recId.isValid()) {
         qint64 secsRecurId;
@@ -2174,36 +2035,6 @@ bool SqliteFormat::Private::selectAttachments(Incidence::Ptr &incidence, int row
 
 error:
     return false;
-}
-
-bool SqliteFormat::Private::selectCalendarProperties(Notebook::Ptr notebook)
-{
-    int rv = 0;
-    int index = 1;
-    const QByteArray id(notebook->uid().toUtf8());
-    bool success = false;
-
-    if (!mSelectCalProps) {
-        const char *query = SELECT_CALENDARPROPERTIES_BY_ID;
-        int qsize = sizeof(SELECT_CALENDARPROPERTIES_BY_ID);
-        SL3_prepare_v2(mDatabase, query, qsize, &mSelectCalProps, NULL);
-    }
-
-    SL3_bind_text(mSelectCalProps, index, id.constData(), id.length(), SQLITE_STATIC);
-    do {
-        SL3_step(mSelectCalProps);
-        if (rv == SQLITE_ROW) {
-            const QByteArray name = (const char *)sqlite3_column_text(mSelectCalProps, 1);
-            const QString value = QString::fromUtf8((const char *)sqlite3_column_text(mSelectCalProps, 2));
-            notebook->setCustomProperty(name, value);
-        }
-    } while (rv != SQLITE_DONE);
-    success = true;
-
-error:
-    sqlite3_reset(mSelectCalProps);
-
-    return success;
 }
 
 sqlite3_int64 SqliteFormat::toOriginTime(const QDateTime &dt)

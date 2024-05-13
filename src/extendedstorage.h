@@ -34,7 +34,6 @@
 #include "mkcal_export.h"
 #include "extendedcalendar.h"
 #include "extendedstorageobserver.h"
-#include "notebook.h"
 
 #include <KCalendarCore/CalStorage>
 #include <KCalendarCore/Calendar>
@@ -82,8 +81,6 @@ public:
       Constructs a new ExtendedStorage object.
 
       @param cal is a pointer to a valid Calendar object.
-      @param validateNotebooks set to true for loading/saving only those
-             incidences that belong to an existing notebook of this storage
 
       @warning Do not use storage as a global object, on closing the application
       it can dead lock. If you do so, be ready to destroy it manually before the
@@ -93,7 +90,7 @@ public:
       cannot change. It is possible to do so through the API, but the internal
       hash tables will not be updated and hence the changes will not be tracked.
     */
-    explicit ExtendedStorage(const ExtendedCalendar::Ptr &cal, bool validateNotebooks = true);
+    explicit ExtendedStorage(const ExtendedCalendar::Ptr &cal);
 
     /**
       Destructor.
@@ -183,26 +180,14 @@ public:
     virtual bool loadIncidenceInstance(const QString &instanceIdentifier);
 
     /**
-      Load incidences of one notebook into the memory.
-
-      @param notebookUid is uid of notebook
-      @return true if the load was successful; false otherwise.
-    */
-    virtual bool loadNotebookIncidences(const QString &notebookUid) = 0;
-
-    /**
       Remove from storage all incidences that have been previously
       marked as deleted and that matches the UID / RecID of the incidences
       in list. The action is performed immediately on database.
 
       @param list is the incidences to remove from the DB
-      @param notebook is the notebook they belong to,
-             using an empty notebook uid is deprecated, but kept for
-             backward backward compatibility.
       @return True on success, false otherwise.
      */
-    virtual bool purgeDeletedIncidences(const KCalendarCore::Incidence::List &list,
-                                        const QString &notebook = QString()) = 0;
+    virtual bool purgeDeletedIncidences(const KCalendarCore::Incidence::List &list) = 0;
 
     /**
       @copydoc
@@ -270,12 +255,10 @@ public:
 
       @param list inserted incidences
       @param after list only incidences inserted after or at given datetime
-      @param notebookUid list only incidences for given notebook
       @return true if execution was scheduled; false otherwise
     */
     virtual bool insertedIncidences(KCalendarCore::Incidence::List *list,
-                                    const QDateTime &after = QDateTime(),
-                                    const QString &notebookUid = QString()) = 0;
+                                    const QDateTime &after = QDateTime()) = 0;
 
     /**
       Get modified incidences from storage.
@@ -284,34 +267,28 @@ public:
 
       @param list modified incidences
       @param after list only incidences modified after or at given datetime
-      @param notebookUid list only incidences for given notebook
       @return true if execution was scheduled; false otherwise
     */
     virtual bool modifiedIncidences(KCalendarCore::Incidence::List *list,
-                                    const QDateTime &after = QDateTime(),
-                                    const QString &notebookUid = QString()) = 0;
+                                    const QDateTime &after = QDateTime()) = 0;
 
     /**
       Get deleted incidences from storage.
 
       @param list deleted incidences
       @param after list only incidences deleted after or at given datetime
-      @param notebookUid list only incidences for given notebook
       @return true if execution was scheduled; false otherwise
     */
     virtual bool deletedIncidences(KCalendarCore::Incidence::List *list,
-                                   const QDateTime &after = QDateTime(),
-                                   const QString &notebookUid = QString()) = 0;
+                                   const QDateTime &after = QDateTime()) = 0;
 
     /**
       Get all incidences from storage.
 
       @param list notebook's incidences
-      @param notebookUid list incidences for given notebook
       @return true if execution was scheduled; false otherwise
     */
-    virtual bool allIncidences(KCalendarCore::Incidence::List *list,
-                               const QString &notebookUid = QString()) = 0;
+    virtual bool allIncidences(KCalendarCore::Incidence::List *list) = 0;
 
     /**
       Get all incidences from storage that match key. Incidences are
@@ -347,13 +324,10 @@ public:
     // Observer Specific Methods //
 
     /**
-      Registers an Observer for this Storage.
-
-      @param observer is a pointer to an Observer object that will be
-      watching this Storage.
-
-      @see unregisterObserver()
-     */
+      @copydoc
+      Calendar::addJournal()
+    */
+    bool addJournal(const KCalendarCore::Journal::Ptr &journal);
     void registerObserver(ExtendedStorageObserver *observer);
 
     /**
@@ -366,109 +340,6 @@ public:
      */
     void unregisterObserver(ExtendedStorageObserver *observer);
 
-    // Notebook Methods //
-
-    /**
-      Add new notebook to the storage.
-      Notebook object is owned by the storage if operation succeeds.
-      Operation is executed immediately into storage, @see modifyNotebook().
-
-      @param nb notebook
-      @return true if operation was successful; false otherwise.
-
-      @note if the Notebook doesn't have a uid that is a valid UUID a new one will
-      be generated on insertion.
-    */
-    bool addNotebook(const Notebook::Ptr &nb);
-
-    /**
-      Update notebook parameters.
-      Operation is executed immediately into storage, @see modifyNotebook().
-
-      @param nb notebook
-      @return true if add was successful; false otherwise.
-    */
-    bool updateNotebook(const Notebook::Ptr &nb);
-
-    /**
-      Delete notebook from storage.
-      Operation is executed immediately into storage, @see modifyNotebook().
-
-      @param nb notebook
-      @return true if delete was successful; false otherwise.
-    */
-    bool deleteNotebook(const Notebook::Ptr &nb);
-
-    /**
-      setDefaultNotebook to the storage.
-
-      @param nb notebook
-      @return true if operation was successful; false otherwise.
-    */
-    bool setDefaultNotebook(const Notebook::Ptr &nb);
-
-    /**
-      defaultNotebook.
-
-      @return pointer to default notebook.
-    */
-    Notebook::Ptr defaultNotebook();
-
-    /**
-      Search for notebook.
-
-      @param uid notebook uid
-      @return pointer to notebook
-    */
-    Notebook::Ptr notebook(const QString &uid) const;
-
-    /**
-      List all notebooks.
-
-      @return list of notebooks
-    */
-    Notebook::List notebooks();
-
-    /**
-      Determine if notebooks should be validated in saves and loads.
-      That means that storage can only load/save incidences into/from
-      existing notebooks.
-
-      @param validate true to validate
-    */
-    void setValidateNotebooks(bool validateNotebooks);
-
-    /**
-      Returns true if notebooks should be validated in saves and loads.
-      That means that storage can only load/save incidences into/from
-      existing notebooks.
-
-      @return true to validate notebooks
-    */
-    bool validateNotebooks() const;
-
-    /**
-      Returns true if the given notebook is valid for the storage.
-      That means that storage can load/save incidences on this notebook.
-
-      @param notebookUid notebook uid
-      @return true or false
-    */
-    bool isValidNotebook(const QString &notebookUid) const;
-
-    /**
-      Creates and sets a default notebook. Usually called for an empty
-      calendar.
-
-      Notice: deprecated since 0.6.10. Instead, create a notebook
-              and call setDefaultNotebook().
-
-      @param name notebook's name, if empty default used
-      @param color notebook's color in format "#FF0042", if empty default used
-      @return pointer to the created notebook
-    */
-    Notebook::Ptr createDefaultNotebook(QString name = QString(),
-                                        QString color = QString());
 
     /**
       Standard trick to add virtuals later.
@@ -480,11 +351,6 @@ public:
     virtual void virtual_hook(int id, void *data) = 0;
 
 protected:
-    virtual bool loadNotebooks() = 0;
-    virtual bool insertNotebook(const Notebook::Ptr &nb) = 0;
-    virtual bool modifyNotebook(const Notebook::Ptr &nb) = 0;
-    virtual bool eraseNotebook(const Notebook::Ptr &nb) = 0;
-
     bool getLoadDates(const QDate &start, const QDate &end,
                       QDateTime *loadStart, QDateTime *loadEnd) const;
 
